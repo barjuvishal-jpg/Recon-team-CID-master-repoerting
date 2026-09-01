@@ -2529,30 +2529,56 @@
     }
 
     // ==========================================
-    // COPY AS IMAGE UTILITY (html2canvas)
+    // COPY AS IMAGE UTILITY (html2canvas - FULL REPORT CAPTURE)
     // ==========================================
     function copyTableAsImage(elementId, reportName) {
       const card = document.getElementById(elementId);
       if (!card) return;
+
+      const container = card.querySelector('.report-table-container') || card;
+      const table = card.querySelector('table');
 
       if (typeof html2canvas === 'undefined') {
         alert('Image snapshot tool is loading, please try again in a few seconds.');
         return;
       }
 
-      const originalBtn = event ? event.target : null;
+      const originalBtn = event && event.target ? (event.target.tagName === 'BUTTON' ? event.target : event.target.closest('button')) : null;
       let prevText = '';
       if (originalBtn) {
         prevText = originalBtn.innerText;
-        originalBtn.innerText = 'Capturing...';
+        originalBtn.innerText = 'Capturing Full Report...';
         originalBtn.disabled = true;
       }
+
+      // Save original styles
+      const origMaxHeight = container.style.maxHeight;
+      const origOverflow = container.style.overflow;
+      const origCardOverflow = card.style.overflow;
+
+      // Expand container so html2canvas renders every single row and column without scroll clipping
+      container.style.maxHeight = 'none';
+      container.style.overflow = 'visible';
+      card.style.overflow = 'visible';
+
+      const fullWidth = Math.max(table ? table.scrollWidth : card.scrollWidth, card.offsetWidth, 1200);
+      const fullHeight = Math.max(table ? table.scrollHeight : card.scrollHeight, card.offsetHeight);
 
       html2canvas(card, {
         scale: 2,
         backgroundColor: '#ffffff',
-        useCORS: true
+        useCORS: true,
+        logging: false,
+        width: fullWidth,
+        height: fullHeight,
+        windowWidth: fullWidth + 100,
+        windowHeight: fullHeight + 100
       }).then(canvas => {
+        // Restore original scroll styles immediately
+        container.style.maxHeight = origMaxHeight;
+        container.style.overflow = origOverflow;
+        card.style.overflow = origCardOverflow;
+
         if (originalBtn) {
           originalBtn.innerText = prevText;
           originalBtn.disabled = false;
@@ -2563,7 +2589,7 @@
             navigator.clipboard.write([
               new ClipboardItem({ 'image/png': blob })
             ]).then(() => {
-              alert('🎉 Table copied as image to your clipboard! You can now paste (Ctrl+V) it anywhere.');
+              alert('🎉 Full report copied as high-res image to clipboard! You can paste (Ctrl+V) it anywhere.');
             }).catch(() => {
               downloadCanvasImage(canvas, reportName);
             });
@@ -2572,22 +2598,26 @@
           }
         }, 'image/png');
       }).catch(err => {
+        container.style.maxHeight = origMaxHeight;
+        container.style.overflow = origOverflow;
+        card.style.overflow = origCardOverflow;
+
         if (originalBtn) {
           originalBtn.innerText = prevText;
           originalBtn.disabled = false;
         }
-        alert('Failed to capture table image: ' + (err.message || err));
+        alert('Failed to capture full report image: ' + (err.message || err));
       });
     }
 
     function downloadCanvasImage(canvas, reportName) {
       const link = document.createElement('a');
-      link.download = `${reportName}_${new Date().toISOString().slice(0,10)}.png`;
+      link.download = `${reportName}_Full_${new Date().toISOString().slice(0,10)}.png`;
       link.href = canvas.toDataURL('image/png');
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      alert('📷 Image downloaded successfully!');
+      alert('📷 Full report image downloaded successfully!');
     }
 
     // Call on load
