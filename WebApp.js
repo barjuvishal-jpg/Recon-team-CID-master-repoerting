@@ -590,6 +590,51 @@ function getDashboardData(filterEmp = 'All Employees', filterAct = 'All Activiti
     };
   });
 
+  // 1. Weekday Heatmap Calculation
+  const weekdayCounts = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+  const teamActCounts = {};
+
+  filteredEntries.forEach(entry => {
+    const d = parseDateValue(entry.date);
+    if (d) {
+      const day = d.getDay();
+      weekdayCounts[day] = (weekdayCounts[day] || 0) + 1;
+    }
+    if (entry.cols) {
+      Object.keys(entry.cols).forEach(colName => {
+        teamActCounts[colName] = (teamActCounts[colName] || 0) + 1;
+      });
+    }
+  });
+
+  const weekdayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+  const maxDayCount = Math.max(...Object.values(weekdayCounts), 1);
+  const weekdayHeatmap = weekdayNames.map((name, idx) => {
+    const cnt = weekdayCounts[idx] || 0;
+    return {
+      day: name,
+      dayIndex: idx,
+      count: cnt,
+      intensity: maxDayCount > 0 ? (cnt / maxDayCount) : 0
+    };
+  });
+
+  // 2. Bottom 5 Performers
+  const bottomPerformers = leaderboard.length > 5 ? leaderboard.slice(-5).reverse() : [...leaderboard].reverse();
+
+  // 3. Activity Breakdown Shares (Team wide)
+  const totalTeamAct = filteredEntries.length;
+  const activityBreakdown = Object.keys(teamActCounts).map(colName => {
+    const cnt = teamActCounts[colName];
+    const pct = totalTeamAct > 0 ? ((cnt / totalTeamAct) * 100).toFixed(1) + '%' : '0.0%';
+    return {
+      activity: colName,
+      count: cnt,
+      share: pct,
+      numericShare: totalTeamAct > 0 ? (cnt / totalTeamAct) * 100 : 0
+    };
+  }).sort((a, b) => b.count - a.count);
+
   return {
     employees: uniqueFilteredEmployees.size,
     employeeNames: employeeNames,
@@ -606,7 +651,9 @@ function getDashboardData(filterEmp = 'All Employees', filterAct = 'All Activiti
     masterRows: totalMasterRows,
     topPerformers: topPerformers,
     leaderboard: leaderboard,
-    employeeProfiles: employeeProfiles,
+    weekdayHeatmap: weekdayHeatmap,
+    bottomPerformers: bottomPerformers,
+    activityBreakdown: activityBreakdown,
     dailyTrendTotal: filteredEntries.length
   };
 }

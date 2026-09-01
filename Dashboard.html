@@ -614,6 +614,112 @@
       flex-shrink: 0;
     }
 
+    /* Analytics View Styles */
+    .heatmap-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .heatmap-card {
+      background: white;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 16px 12px;
+      text-align: center;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .heatmap-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+
+    .heatmap-day {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-light);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .heatmap-value {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--text-dark);
+    }
+
+    .heatmap-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #3b82f6, #6366f1);
+      border-radius: 2px 2px 0 0;
+    }
+
+    .analytics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    .act-share-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid #f1f5f9;
+      font-size: 13px;
+    }
+
+    .act-share-row:last-child {
+      border-bottom: none;
+    }
+
+    .act-share-name {
+      width: 40%;
+      font-weight: 500;
+      color: var(--text-dark);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .act-share-count {
+      width: 20%;
+      text-align: right;
+      font-weight: 700;
+      color: #1e293b;
+    }
+
+    .act-share-bar-container {
+      width: 35%;
+      background: #f1f5f9;
+      height: 16px;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .act-share-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #3b82f6, #2563eb);
+      border-radius: 8px;
+      text-align: right;
+      font-size: 10px;
+      color: white;
+      padding-right: 6px;
+      line-height: 16px;
+      font-weight: 600;
+      box-sizing: border-box;
+      transition: width 0.4s ease;
+    }
+
     /* Modal Popup Overlay */
     .modal-overlay {
       position: fixed;
@@ -774,7 +880,7 @@
         <span class="menu-icon">👥</span>
         Employees
       </div>
-      <div class="menu-item">
+      <div class="menu-item" id="menu-analytics" onclick="switchView('analytics')">
         <span class="menu-icon">📈</span>
         Analytics
       </div>
@@ -1023,6 +1129,72 @@
           <div class="donut-container">
             <svg id="ep-donut-svg" width="180" height="180" viewBox="0 0 200 200"></svg>
             <div id="ep-donut-legend" class="donut-legend"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ANALYTICS VIEW -->
+    <div id="view-analytics" class="view-container hidden">
+      <div class="dashboard-header">
+        <h2 class="dashboard-title">Advanced Performance Analytics</h2>
+        <p class="dashboard-subtitle">Team activity heatmaps, workload distribution, and category breakdown</p>
+      </div>
+
+      <!-- Activity Heatmap (By Weekday) -->
+      <div style="margin-bottom: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <h3 style="font-size: 15px; font-weight: 700; margin: 0;">Activity Heatmap (By Weekday)</h3>
+          <span style="font-size: 12px; color: var(--text-light);">Aggregated volume distribution</span>
+        </div>
+        <div class="heatmap-grid" id="heatmap-container">
+          <!-- 7 Weekday Cards Rendered Dynamically -->
+        </div>
+      </div>
+
+      <!-- Bottom Grid: Bottom 5 Performers + Activity Breakdown Shares -->
+      <div class="analytics-grid">
+        <!-- Bottom 5 Performers Card -->
+        <div class="performers-card">
+          <div style="margin-bottom: 16px;">
+            <h3 class="performers-title" style="margin: 0 0 4px 0; color: #b45309; display: flex; align-items: center; gap: 6px;">
+              <span>⚠️ Bottom 5 Performers</span>
+            </h3>
+            <p style="font-size: 12px; color: var(--text-light); margin: 0;">Lowest activity volume in current period</p>
+          </div>
+
+          <div class="performers-header">
+            <div class="ph-label name">Employee Name</div>
+            <div class="ph-label workload">Workload</div>
+            <div class="ph-label complete">Rank & Load</div>
+          </div>
+
+          <div id="bottom-performers-container">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- Activity Breakdown Shares with Sort feature -->
+        <div class="chart-card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <div>
+              <h3 class="chart-title" style="margin: 0 0 4px 0;">Activity Breakdown Shares</h3>
+              <p style="font-size: 12px; color: var(--text-light); margin: 0;">Category contribution with sorting</p>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <label style="font-size: 11px; font-weight: 600; color: var(--text-light); text-transform: uppercase;">Sort By:</label>
+              <select id="act-sort-select" class="filter-select" style="padding: 4px 8px; font-size: 12px; min-width: 140px;" onchange="renderActivityBreakdownShares(this.value)">
+                <option value="volume-desc">Highest Volume</option>
+                <option value="volume-asc">Lowest Volume</option>
+                <option value="name-asc">Name (A → Z)</option>
+                <option value="name-desc">Name (Z → A)</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="activity-shares-container" style="max-height: 380px; overflow-y: auto; padding-right: 4px;">
+            <!-- Dynamically populated -->
           </div>
         </div>
       </div>
@@ -1309,24 +1481,31 @@
       if (data.leaderboard) {
         populateLeaderboard(data.leaderboard);
       }
+
+      // Populate Analytics View
+      populateAnalytics(data);
     }
 
     function switchView(viewName) {
       const viewDash = document.getElementById('view-dashboard');
       const viewLb = document.getElementById('view-leaderboard');
       const viewEmp = document.getElementById('view-employees');
+      const viewAna = document.getElementById('view-analytics');
 
       const menuDash = document.getElementById('menu-dashboard');
       const menuLb = document.getElementById('menu-leaderboard');
       const menuEmp = document.getElementById('menu-employees');
+      const menuAna = document.getElementById('menu-analytics');
 
       viewDash.classList.add('hidden');
       viewLb.classList.add('hidden');
       if (viewEmp) viewEmp.classList.add('hidden');
+      if (viewAna) viewAna.classList.add('hidden');
 
       if (menuDash) menuDash.classList.remove('active');
       if (menuLb) menuLb.classList.remove('active');
       if (menuEmp) menuEmp.classList.remove('active');
+      if (menuAna) menuAna.classList.remove('active');
 
       if (viewName === 'leaderboard') {
         viewLb.classList.remove('hidden');
@@ -1335,6 +1514,9 @@
         if (viewEmp) viewEmp.classList.remove('hidden');
         if (menuEmp) menuEmp.classList.add('active');
         loadEmployeeProfile();
+      } else if (viewName === 'analytics') {
+        if (viewAna) viewAna.classList.remove('hidden');
+        if (menuAna) menuAna.classList.add('active');
       } else {
         viewDash.classList.remove('hidden');
         if (menuDash) menuDash.classList.add('active');
@@ -1745,6 +1927,131 @@
         }
         alert('CSV Export failed: ' + (err.message || err));
       }).getMasterReportCsvData();
+    }
+
+    let currentActivityBreakdownList = [];
+
+    function populateAnalytics(data) {
+      if (!data) return;
+
+      // 1. Render Weekday Heatmap
+      const heatmapContainer = document.getElementById('heatmap-container');
+      if (heatmapContainer && data.weekdayHeatmap) {
+        heatmapContainer.innerHTML = '';
+        data.weekdayHeatmap.forEach(item => {
+          const card = document.createElement('div');
+          card.className = 'heatmap-card';
+          
+          const pct = Math.round((item.intensity || 0) * 100);
+          card.innerHTML = `
+            <div class="heatmap-day">${item.day}</div>
+            <div class="heatmap-value">${(item.count || 0).toLocaleString()}</div>
+            <div class="heatmap-bar" style="width: ${pct}%;"></div>
+          `;
+          heatmapContainer.appendChild(card);
+        });
+      }
+
+      // 2. Render Bottom 5 Performers
+      const bottomContainer = document.getElementById('bottom-performers-container');
+      if (bottomContainer) {
+        bottomContainer.innerHTML = '';
+        const list = data.bottomPerformers || [];
+        if (list.length === 0) {
+          bottomContainer.innerHTML = '<div style="text-align: center; color: var(--text-light); padding: 20px; font-size: 13px;">No bottom performer data</div>';
+        } else {
+          list.forEach(p => {
+            const row = document.createElement('div');
+            row.className = 'performer-row';
+            
+            const nameDiv = document.createElement('div');
+            nameDiv.className = 'p-name';
+            nameDiv.style.cursor = 'pointer';
+            nameDiv.style.color = 'var(--text-dark)';
+            nameDiv.innerHTML = `<span style="color: #64748b; font-size: 11px; margin-right: 6px;">#${p.rank}</span> <strong>${p.name}</strong>`;
+            nameDiv.onclick = () => viewEmployeeDetail(p.name);
+            
+            const workloadDiv = document.createElement('div');
+            workloadDiv.className = 'p-workload';
+            workloadDiv.innerText = (p.total || 0).toLocaleString();
+            
+            const barContainer = document.createElement('div');
+            barContainer.className = 'p-bar-container';
+            
+            const pctVal = parseFloat(p.contribution) || 5;
+            const bar = document.createElement('div');
+            bar.className = 'p-bar orange';
+            bar.style.width = Math.min(100, Math.max(15, pctVal * 5)) + '%';
+            bar.innerText = p.contribution;
+            
+            barContainer.appendChild(bar);
+            row.appendChild(nameDiv);
+            row.appendChild(workloadDiv);
+            row.appendChild(barContainer);
+            
+            bottomContainer.appendChild(row);
+          });
+        }
+      }
+
+      // 3. Render Activity Breakdown Shares
+      currentActivityBreakdownList = data.activityBreakdown || [];
+      const sortSelect = document.getElementById('act-sort-select');
+      const sortVal = sortSelect ? sortSelect.value : 'volume-desc';
+      renderActivityBreakdownShares(sortVal);
+    }
+
+    function renderActivityBreakdownShares(sortBy = 'volume-desc') {
+      const container = document.getElementById('activity-shares-container');
+      if (!container) return;
+      container.innerHTML = '';
+
+      if (!currentActivityBreakdownList || currentActivityBreakdownList.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: var(--text-light); padding: 20px; font-size: 13px;">No activity breakdown data available</div>';
+        return;
+      }
+
+      const list = [...currentActivityBreakdownList];
+
+      if (sortBy === 'volume-desc') {
+        list.sort((a, b) => b.count - a.count);
+      } else if (sortBy === 'volume-asc') {
+        list.sort((a, b) => a.count - b.count);
+      } else if (sortBy === 'name-asc') {
+        list.sort((a, b) => a.activity.localeCompare(b.activity));
+      } else if (sortBy === 'name-desc') {
+        list.sort((a, b) => b.activity.localeCompare(a.activity));
+      }
+
+      list.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'act-share-row';
+
+        const nameDiv = document.createElement('div');
+        nameDiv.className = 'act-share-name';
+        nameDiv.title = item.activity;
+        nameDiv.innerText = item.activity;
+
+        const countDiv = document.createElement('div');
+        countDiv.className = 'act-share-count';
+        countDiv.innerText = (item.count || 0).toLocaleString();
+
+        const barContainer = document.createElement('div');
+        barContainer.className = 'act-share-bar-container';
+
+        const bar = document.createElement('div');
+        bar.className = 'act-share-bar';
+        const pctWidth = Math.min(100, Math.max(6, item.numericShare || 0));
+        bar.style.width = pctWidth + '%';
+        bar.innerText = item.share;
+
+        barContainer.appendChild(bar);
+        row.appendChild(nameDiv);
+        row.appendChild(countDiv);
+        row.appendChild(barContainer);
+
+        container.appendChild(row);
+      });
     }
 
     // Call on load
