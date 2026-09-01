@@ -904,6 +904,80 @@
     }
     .btn-copy-image:hover { background-color: #059669; }
 
+    /* Import Sync Styles */
+    .sync-status-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .sync-card {
+      background: white;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+      margin-bottom: 24px;
+    }
+
+    .btn-sync-now {
+      background: linear-gradient(135deg, #4f46e5, #4338ca);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+      transition: all 0.2s;
+    }
+    .btn-sync-now:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(79, 70, 229, 0.4);
+    }
+    .btn-sync-now:disabled {
+      background: #94a3b8;
+      cursor: not-allowed;
+      box-shadow: none;
+      transform: none;
+    }
+
+    .btn-refresh-tabs {
+      background: white;
+      color: #3b82f6;
+      border: 1px solid #bfdbfe;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.15s;
+    }
+    .btn-refresh-tabs:hover {
+      background: #eff6ff;
+    }
+
+    .status-badge-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .status-badge-pill.success { background: #dcfce7; color: #15803d; }
+    .status-badge-pill.running { background: #dbeafe; color: #1d4ed8; }
+    .status-badge-pill.failed { background: #fee2e2; color: #b91c1c; }
+    .status-badge-pill.ready { background: #f1f5f9; color: #475569; }
+
     /* Modal Popup Overlay */
     .modal-overlay {
       position: fixed;
@@ -1082,7 +1156,7 @@
           </div>
         </div>
       </div>
-      <div class="menu-item">
+      <div class="menu-item" id="menu-import-sync" onclick="switchView('import-sync')">
         <span class="menu-icon">🔄</span>
         Import Sync
       </div>
@@ -1480,6 +1554,123 @@
       </div>
     </div>
 
+    <!-- IMPORT SYNC VIEW -->
+    <div id="view-import-sync" class="view-container hidden">
+      <div class="dashboard-header">
+        <h2 class="dashboard-title">Import & Data Sync Center</h2>
+        <p class="dashboard-subtitle">Synchronize operational master records from external Google Spreadsheets (Code.js Engine)</p>
+      </div>
+
+      <!-- Sync Status Grid (4 KPI Cards) -->
+      <div class="sync-status-grid">
+        <div class="card">
+          <div class="card-label">Last Synchronized</div>
+          <div class="card-value" id="sync-val-time" style="font-size: 15px; font-weight: 700; color: #1e293b; white-space: normal; line-height: 1.3;">-</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Sync Status</div>
+          <div class="card-value" id="sync-val-status">
+            <span class="status-badge-pill ready">Checking...</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-label">Total Rows Synced</div>
+          <div class="card-value" id="sync-val-total">-</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Source Connection</div>
+          <div class="card-value" id="sync-val-connected" style="font-size: 15px; font-weight: 700;">-</div>
+        </div>
+      </div>
+
+      <!-- Main Action & Source URL Card -->
+      <div class="sync-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 16px;">
+          <div>
+            <h3 style="margin: 0 0 4px 0; font-size: 16px; font-weight: 700;">⚡ Execute Live Synchronization</h3>
+            <p style="margin: 0; font-size: 13px; color: var(--text-light);">Imports updated records from source sheets and appends directly to Master Report tabs</p>
+          </div>
+          <div style="display: flex; gap: 12px; align-items: center;">
+            <button class="btn-refresh-tabs" id="btn-refresh-tabs" onclick="triggerRefreshTabs()">
+              🔄 Refresh Source Tabs
+            </button>
+            <button class="btn-sync-now" id="btn-sync-trigger" onclick="triggerSyncExecution()">
+              ⚡ Sync Data Now
+            </button>
+          </div>
+        </div>
+
+        <!-- Sync Progress / Alert Box -->
+        <div id="sync-progress-box" style="display: none; padding: 14px 18px; border-radius: 8px; margin-bottom: 20px; font-size: 13px;"></div>
+
+        <!-- Source Spreadsheet URL Box -->
+        <div style="background: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid var(--border-color);">
+          <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-light); text-transform: uppercase; margin-bottom: 6px;">
+            Source Google Spreadsheet URL (Config!B2)
+          </label>
+          <div style="display: flex; gap: 10px;">
+            <input type="text" id="sync-source-url" class="filter-select" style="flex: 1; font-family: monospace; font-size: 12px;" placeholder="https://docs.google.com/spreadsheets/d/...">
+            <button class="btn-export" style="background: white; border: 1px solid var(--border-color);" onclick="saveSourceUrlOnly()">
+              💾 Save URL
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Mappings Card -->
+      <div class="sync-card" style="padding: 0; overflow: hidden;">
+        <div style="padding: 16px 20px; border-bottom: 1px solid var(--border-color); background: #f8fafc; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h3 style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700;">📑 Active Sheet Tab Mappings (Config!A9:D10)</h3>
+            <p style="margin: 0; font-size: 12px; color: var(--text-light);">How source sheet tabs map to Master destination sheets</p>
+          </div>
+          <button class="btn-export" style="font-size: 12px; padding: 4px 10px;" onclick="saveTabMappings()">
+            💾 Save Mappings
+          </button>
+        </div>
+
+        <table class="lb-table" style="font-size: 13px;">
+          <thead>
+            <tr>
+              <th style="width: 25%;">Import Type</th>
+              <th style="width: 30%;">Source Tab</th>
+              <th style="width: 25%;">Destination Tab</th>
+              <th style="width: 20%; text-align: center;">Clear Before Import</th>
+            </tr>
+          </thead>
+          <tbody id="sync-mappings-body">
+            <tr><td colspan="4" style="text-align: center; padding: 20px; color: var(--text-light);">Loading mappings...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Sync Audit Logs Card -->
+      <div class="sync-card" style="padding: 0; overflow: hidden;">
+        <div style="padding: 16px 20px; border-bottom: 1px solid var(--border-color); background: #f8fafc;">
+          <h3 style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700;">📜 Synchronization Execution History</h3>
+          <p style="margin: 0; font-size: 12px; color: var(--text-light);">Audit log of previous data import executions (Config!A16:D)</p>
+        </div>
+
+        <div style="max-height: 280px; overflow-y: auto;">
+          <table class="lb-table" style="font-size: 13px;">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th style="text-align: right;">Close Cases Rows</th>
+                <th style="text-align: right;">Forwarded Cases Rows</th>
+                <th style="text-align: right;">Total Rows</th>
+                <th style="text-align: center;">Status</th>
+              </tr>
+            </thead>
+            <tbody id="sync-logs-body">
+              <tr><td colspan="5" style="text-align: center; padding: 20px; color: var(--text-light);">Loading sync logs...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
   </main>
 
   <!-- Unknown Activities Modal -->
@@ -1783,6 +1974,7 @@
       const viewAna = document.getElementById('view-analytics');
       const viewMr = document.getElementById('view-monthly-report');
       const viewCdr = document.getElementById('view-custom-date-report');
+      const viewSync = document.getElementById('view-import-sync');
 
       const menuDash = document.getElementById('menu-dashboard');
       const menuLb = document.getElementById('menu-leaderboard');
@@ -1790,6 +1982,7 @@
       const menuAna = document.getElementById('menu-analytics');
       const menuMr = document.getElementById('menu-monthly-report');
       const menuCdr = document.getElementById('menu-custom-date-report');
+      const menuSync = document.getElementById('menu-import-sync');
 
       viewDash.classList.add('hidden');
       viewLb.classList.add('hidden');
@@ -1797,6 +1990,7 @@
       if (viewAna) viewAna.classList.add('hidden');
       if (viewMr) viewMr.classList.add('hidden');
       if (viewCdr) viewCdr.classList.add('hidden');
+      if (viewSync) viewSync.classList.add('hidden');
 
       if (menuDash) menuDash.classList.remove('active');
       if (menuLb) menuLb.classList.remove('active');
@@ -1804,6 +1998,7 @@
       if (menuAna) menuAna.classList.remove('active');
       if (menuMr) menuMr.classList.remove('active');
       if (menuCdr) menuCdr.classList.remove('active');
+      if (menuSync) menuSync.classList.remove('active');
 
       if (viewName === 'leaderboard') {
         viewLb.classList.remove('hidden');
@@ -1827,6 +2022,10 @@
         const submenu = document.getElementById('reports-submenu');
         if (submenu) submenu.classList.remove('hidden');
         loadCustomDateReport();
+      } else if (viewName === 'import-sync') {
+        if (viewSync) viewSync.classList.remove('hidden');
+        if (menuSync) menuSync.classList.add('active');
+        loadSyncData();
       } else {
         viewDash.classList.remove('hidden');
         if (menuDash) menuDash.classList.add('active');
@@ -2618,6 +2817,236 @@
       link.click();
       document.body.removeChild(link);
       alert('📷 Full report image downloaded successfully!');
+    }
+
+    // ==========================================
+    // IMPORT SYNC CONTROLLERS
+    // ==========================================
+    let currentSyncData = null;
+
+    function loadSyncData() {
+      const pBox = document.getElementById('sync-progress-box');
+      if (pBox) pBox.style.display = 'none';
+
+      google.script.run
+        .withSuccessHandler(populateSyncData)
+        .withFailureHandler(function(err) {
+          alert('Error loading sync status: ' + (err.message || err));
+        })
+        .getSyncStatusData();
+    }
+
+    function populateSyncData(data) {
+      if (!data) return;
+      currentSyncData = data;
+
+      document.getElementById('sync-val-time').innerText = data.lastSync || 'Never';
+
+      const statusEl = document.getElementById('sync-val-status');
+      const isSuccess = (data.status || '').toLowerCase() === 'success';
+      const isFailed = (data.status || '').toLowerCase().includes('fail');
+      let statusClass = 'ready';
+      if (isSuccess) statusClass = 'success';
+      else if (isFailed) statusClass = 'failed';
+      statusEl.innerHTML = `<span class="status-badge-pill ${statusClass}">${data.status || 'Ready'}</span>`;
+
+      document.getElementById('sync-val-total').innerText = (Number(data.totalImported) || 0).toLocaleString();
+
+      const connEl = document.getElementById('sync-val-connected');
+      if (data.sourceConnected) {
+        connEl.innerHTML = '<span style="color: #16a34a;">🟢 Connected</span>';
+      } else if (data.sourceUrl) {
+        connEl.innerHTML = '<span style="color: #ea580c;">🟠 Check Access</span>';
+      } else {
+        connEl.innerHTML = '<span style="color: #dc2626;">🔴 Not Set</span>';
+      }
+
+      const urlInput = document.getElementById('sync-source-url');
+      if (urlInput) urlInput.value = data.sourceUrl || '';
+
+      // Populate Mappings Table
+      const mapTbody = document.getElementById('sync-mappings-body');
+      mapTbody.innerHTML = '';
+      if (!data.mappings || data.mappings.length === 0) {
+        mapTbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-light); padding: 20px;">No mapping configuration found.</td></tr>';
+      } else {
+        data.mappings.forEach((m, idx) => {
+          const tr = document.createElement('tr');
+          
+          let selectHtml = `<select class="filter-select" id="mapping-source-${idx}" style="width: 100%; font-size: 13px;">`;
+          if (data.sourceTabs && data.sourceTabs.length > 0) {
+            data.sourceTabs.forEach(tab => {
+              const selected = (tab === m.sourceTab) ? 'selected' : '';
+              selectHtml += `<option value="${tab}" ${selected}>${tab}</option>`;
+            });
+          } else {
+            selectHtml += `<option value="${m.sourceTab}">${m.sourceTab || 'Select Source Tab'}</option>`;
+          }
+          selectHtml += '</select>';
+
+          tr.innerHTML = `
+            <td><strong>${m.importType}</strong></td>
+            <td>${selectHtml}</td>
+            <td><input type="text" class="filter-select" id="mapping-dest-${idx}" value="${m.destinationTab}" style="width: 100%; font-size: 13px;"></td>
+            <td style="text-align: center;">
+              <input type="checkbox" id="mapping-clear-${idx}" ${m.clearBeforeImport ? 'checked' : ''} style="width: 18px; height: 18px; accent-color: var(--primary-blue); cursor: pointer;">
+            </td>
+          `;
+          mapTbody.appendChild(tr);
+        });
+      }
+
+      // Populate Logs Table
+      const logTbody = document.getElementById('sync-logs-body');
+      logTbody.innerHTML = '';
+      if (!data.logs || data.logs.length === 0) {
+        logTbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-light); padding: 20px;">No sync history recorded yet.</td></tr>';
+      } else {
+        data.logs.forEach(l => {
+          const tr = document.createElement('tr');
+          const isLSuccess = (l.status || '').toLowerCase() === 'success';
+          tr.innerHTML = `
+            <td>${l.timestamp}</td>
+            <td style="text-align: right;">${(Number(l.closeRows) || 0).toLocaleString()}</td>
+            <td style="text-align: right;">${(Number(l.forwardedRows) || 0).toLocaleString()}</td>
+            <td style="text-align: right; font-weight: 600;">${(Number(l.totalRows) || 0).toLocaleString()}</td>
+            <td style="text-align: center;">
+              <span class="status-badge-pill ${isLSuccess ? 'success' : 'failed'}">${l.status}</span>
+            </td>
+          `;
+          logTbody.appendChild(tr);
+        });
+      }
+    }
+
+    function triggerRefreshTabs() {
+      const btn = document.getElementById('btn-refresh-tabs');
+      const urlInput = document.getElementById('sync-source-url');
+      const customUrl = urlInput ? urlInput.value.trim() : '';
+
+      if (btn) {
+        btn.innerText = 'Refreshing Tabs...';
+        btn.disabled = true;
+      }
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (btn) {
+            btn.innerText = '🔄 Refresh Source Tabs';
+            btn.disabled = false;
+          }
+          alert(`✅ Success! ${res.count || 0} sheet tabs discovered in source workbook.`);
+          loadSyncData();
+        })
+        .withFailureHandler(function(err) {
+          if (btn) {
+            btn.innerText = '🔄 Refresh Source Tabs';
+            btn.disabled = false;
+          }
+          alert('Failed to refresh source tabs: ' + (err.message || err));
+        })
+        .executeRefreshSourceTabs(customUrl);
+    }
+
+    function triggerSyncExecution() {
+      const btn = document.getElementById('btn-sync-trigger');
+      const pBox = document.getElementById('sync-progress-box');
+
+      if (!confirm('Are you sure you want to execute live data synchronization? This will update the Master Report sheets with data from the operational source.')) {
+        return;
+      }
+
+      if (btn) {
+        btn.innerText = '⏳ Syncing Data...';
+        btn.disabled = true;
+      }
+
+      if (pBox) {
+        pBox.style.display = 'block';
+        pBox.style.backgroundColor = '#eff6ff';
+        pBox.style.border = '1px solid #bfdbfe';
+        pBox.style.color = '#1e40af';
+        pBox.innerHTML = '<strong>⚡ Synchronization in progress...</strong> Reading source sheets and writing to master destination tabs. Please wait a moment.';
+      }
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (btn) {
+            btn.innerText = '⚡ Sync Data Now';
+            btn.disabled = false;
+          }
+          if (pBox) {
+            pBox.style.backgroundColor = '#ecfdf5';
+            pBox.style.border = '1px solid #a7f3d0';
+            pBox.style.color = '#065f46';
+            pBox.innerHTML = `🎉 <strong>Sync Completed Successfully!</strong><br>• Close Cases: ${res.closeRows.toLocaleString()} rows<br>• Forwarded Cases: ${res.forwardedRows.toLocaleString()} rows<br>• Total Synced: ${res.totalImported.toLocaleString()} rows`;
+          }
+          loadSyncData();
+        })
+        .withFailureHandler(function(err) {
+          if (btn) {
+            btn.innerText = '⚡ Sync Data Now';
+            btn.disabled = false;
+          }
+          if (pBox) {
+            pBox.style.backgroundColor = '#fef2f2';
+            pBox.style.border = '1px solid #fecaca';
+            pBox.style.color = '#991b1b';
+            pBox.innerHTML = `⚠️ <strong>Sync Failed:</strong> ${err.message || err}`;
+          }
+          loadSyncData();
+        })
+        .executeDataSync();
+    }
+
+    function saveSourceUrlOnly() {
+      const urlInput = document.getElementById('sync-source-url');
+      const url = urlInput ? urlInput.value.trim() : '';
+      if (!url) {
+        alert('Please enter a valid Google Spreadsheet URL.');
+        return;
+      }
+
+      google.script.run
+        .withSuccessHandler(function() {
+          alert('✅ Source URL saved to Config sheet.');
+          loadSyncData();
+        })
+        .withFailureHandler(function(err) {
+          alert('Failed to save URL: ' + (err.message || err));
+        })
+        .saveSyncMappings(url, []);
+    }
+
+    function saveTabMappings() {
+      const urlInput = document.getElementById('sync-source-url');
+      const url = urlInput ? urlInput.value.trim() : '';
+
+      const mappingList = [];
+      if (currentSyncData && currentSyncData.mappings) {
+        currentSyncData.mappings.forEach((m, idx) => {
+          const srcSelect = document.getElementById(`mapping-source-${idx}`);
+          const destInput = document.getElementById(`mapping-dest-${idx}`);
+          const clearCheck = document.getElementById(`mapping-clear-${idx}`);
+
+          mappingList.push({
+            importType: m.importType,
+            sourceTab: srcSelect ? srcSelect.value : m.sourceTab,
+            destinationTab: destInput ? destInput.value.trim() : m.destinationTab,
+            clearBeforeImport: clearCheck ? clearCheck.checked : m.clearBeforeImport
+          });
+        });
+      }
+
+      google.script.run
+        .withSuccessHandler(function() {
+          alert('✅ Tab mappings successfully saved to Config!A9:D10.');
+          loadSyncData();
+        })
+        .withFailureHandler(function(err) {
+          alert('Failed to save mappings: ' + (err.message || err));
+        })
+        .saveSyncMappings(url, mappingList);
     }
 
     // Call on load

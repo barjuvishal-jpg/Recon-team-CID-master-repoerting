@@ -1099,3 +1099,216 @@ function getCustomDateReportData(dateFrom = '', dateTo = '') {
     rows: rows
   };
 }
+
+/**
+ * Retrieves current sync configuration, mappings, and historical audit logs from Config sheet
+ */
+function getSyncStatusData() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const config = ss.getSheetByName("Config");
+
+  if (!config) {
+    return {
+      error: "Config sheet not found in the spreadsheet."
+    };
+  }
+
+  const sourceUrl = String(config.getRange("B2").getDisplayValue() || '').trim();
+  const lastSyncRaw = config.getRange("B3").getValue();
+  const lastSync = (lastSyncRaw instanceof Date) ? Utilities.formatDate(lastSyncRaw, Session.getScriptTimeZone() || 'GMT', "dd-MMM-yyyy hh:mm:ss a") : String(lastSyncRaw || 'Never');
+  const status = String(config.getRange("B4").getDisplayValue() || 'Ready').trim();
+  const totalImported = config.getRange("B5").getValue() || 0;
+
+  // Read mappings from A9:D10
+  const mappingVals = config.getRange("A9:D10").getValues();
+  const mappings = mappingVals.map(m => {
+    return {
+      importType: String(m[0] || ''),
+      sourceTab: String(m[1] || ''),
+      destinationTab: String(m[2] || ''),
+      clearBeforeImport: (m[3] === true || String(m[3]).toUpperCase() === 'TRUE')
+    };
+  });
+
+  // Read historical sync logs from row 16 onwards
+  const lastRow = config.getLastRow();
+  const logs = [];
+  if (lastRow >= 16) {
+    const logData = config.getRange(16, 1, lastRow - 15, 4).getValues();
+    logData.forEach(r => {
+      if (r[0] || r[3]) {
+        const timeVal = (r[0] instanceof Date) ? Utilities.formatDate(r[0], Session.getScriptTimeZone() || 'GMT', "dd-MMM-yyyy hh:mm:ss a") : String(r[0] || '-');
+        logs.push({
+          timestamp: timeVal,
+          closeRows: r[1] || 0,
+          forwardedRows: r[2] || 0,
+          totalRows: (Number(r[1]) || 0) + (Number(r[2]) || 0),
+          status: String(r[3] || 'Success')
+        });
+      }
+    });
+  }
+
+  // Attempt to fetch source tabs if URL is available
+  let sourceTabs = [];
+  let sourceConnected = false;
+  if (sourceUrl) {
+    try {
+      const sourceSS = SpreadsheetApp.openByUrl(sourceUrl);
+      sourceTabs = sourceSS.getSheets().map(s => s.getName());
+      sourceConnected = true;
+    } catch (e) {
+      sourceConnected = false;
+    }
+  }
+
+  return {
+    sourceUrl: sourceUrl,
+    lastSync: lastSync,
+    status: status,
+    totalImported: totalImported,
+    mappings: mappings,
+    sourceTabs: sourceTabs,
+    sourceConnected: sourceConnected,
+    logs: logs.reverse()
+  };
+}
+
+/**
+ * Refreshes available sheet tab dropdowns from the source spreadsheet
+ */
+function executeRefreshSourceTabs(customSourceUrl = '') {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const config = ss.getSheetByName("Config");
+  if (!config) throw new Error("Config sheet not found.");
+
+  if (customSourceUrl) {
+    config.getRange("B2").setValue(customSourceUrl.trim());
+  }
+
+  const sourceUrl = customSourceUrl ? customSourceUrl.trim() : String(config.getRange("B2").getDisplayValue() || '').trim();
+  if (!sourceUrl) throw new Error("Please enter a valid Source Spreadsheet URL.");
+
+  const sourceSS = SpreadsheetApp.openByUrl(sourceUrl);
+  const sheetNames = sourceSS.getSheets().map(s => s.getName());
+
+  if (sheetNames.length > 0) {
+    const rule = SpreadsheetApp.newDataValidation()
+      .requireValueInList(sheetNames, true)
+      .setAllowInvalid(false)
+      .build();
+    config.getRange("B9:B10").setDataValidation(rule);
+  }
+
+  return {
+    success: true,
+    tabs: sheetNames,
+    count: sheetNames.length
+  };
+}
+
+/**
+ * Executes full data sync according to Code.js logic
+ */
+function executeDataSync() {
+  const masterSS = SpreadsheetApp.getActiveSpreadsheet();
+  const config = masterSS.getSheetByName("Config");
+  if (!config) throw new Error("Config sheet not found.");
+
+  const sourceUrl = String(config.getRange("B2").getDisplayValue() || '').trim();
+  if (!sourceUrl) throw new Error("Source Spreadsheet URL is missing in Config!B2");
+
+  try {
+    const sourceSS = SpreadsheetApp.openByUrl(sourceUrl);
+    const mappings = config.getRange("A9:D10").getValues();
+
+    let totalImported = 0;
+    let closeRows = 0;
+    let forwardedRows = 0;
+
+    mappings.forEach(mapping => {
+      const importType = mapping[0];
+      const sourceTab = mapping[1];
+      const destinationTab = mapping[2];
+      const clearBeforeImport = mapping[3];
+
+      if (!sourceTab || !destinationTab) return;
+
+      const sourceSheet = sourceSS.getSheetByName(sourceTab);
+      const destinationSheet = masterSS.getSheetByName(destinationTab);
+
+      if (!sourceSheet) throw new Error(`Source tab not found: ${sourceTab}`);
+      if (!destinationSheet) throw new Error(`Destination tab not found: ${destinationTab}`);
+
+      const data = sourceSheet.getDataRange().getValues();
+      if (data.length <= 1) return;
+
+      // Clear existing data keeping headers
+      if (clearBeforeImport === true || String(clearBeforeImport).toUpperCase() === "TRUE") {
+        const lastRow = destinationSheet.getLastRow();
+        if (lastRow > 1) {
+          destinationSheet.getRange(2, 1, lastRow - 1, destinationSheet.getMaxColumns()).clearContent();
+        }
+      }
+
+      // Skip header row
+      const rows = data.slice(1);
+      destinationSheet.getRange(destinationSheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
+
+      totalImported += rows.length;
+      if (importType === "Close Cases") closeRows += rows.length;
+      if (importType === "Forwarded Cases") forwardedRows += rows.length;
+    });
+
+    // Update status cells
+    const syncTime = new Date();
+    config.getRange("B3").setValue(syncTime);
+    config.getRange("B4").setValue("Success");
+    config.getRange("B5").setValue(totalImported);
+
+    // Sync Log
+    const logRow = Math.max(config.getLastRow() + 1, 16);
+    config.getRange(logRow, 1, 1, 4).setValues([[syncTime, closeRows, forwardedRows, "Success"]]);
+
+    return {
+      success: true,
+      closeRows: closeRows,
+      forwardedRows: forwardedRows,
+      totalImported: totalImported,
+      timestamp: Utilities.formatDate(syncTime, Session.getScriptTimeZone() || 'GMT', "dd-MMM-yyyy hh:mm:ss a")
+    };
+
+  } catch (error) {
+    config.getRange("B3").setValue(new Date());
+    config.getRange("B4").setValue("Failed");
+    const logRow = Math.max(config.getLastRow() + 1, 16);
+    config.getRange(logRow, 1, 1, 4).setValues([[new Date(), 0, 0, "Failed: " + error.message]]);
+    throw new Error(error.message);
+  }
+}
+
+/**
+ * Saves source URL and tab mappings back to Config sheet
+ */
+function saveSyncMappings(sourceUrl, mappingList) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const config = ss.getSheetByName("Config");
+  if (!config) throw new Error("Config sheet not found.");
+
+  if (sourceUrl) {
+    config.getRange("B2").setValue(sourceUrl.trim());
+  }
+
+  if (Array.isArray(mappingList) && mappingList.length > 0) {
+    mappingList.forEach((m, idx) => {
+      const row = 9 + idx;
+      if (row <= 10) {
+        if (m.sourceTab !== undefined) config.getRange(row, 2).setValue(m.sourceTab);
+        if (m.destinationTab !== undefined) config.getRange(row, 3).setValue(m.destinationTab);
+        if (m.clearBeforeImport !== undefined) config.getRange(row, 4).setValue(m.clearBeforeImport);
+      }
+    });
+  }
+
+  return { success: true };
+}
