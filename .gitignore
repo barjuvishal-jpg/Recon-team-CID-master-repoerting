@@ -1,0 +1,10 @@
+# Node / NPM
+node_modules/
+package-lock.json
+
+# Environment & Credentials
+.clasprc.json
+
+# OS files
+.DS_Store
+Thumbs.db
