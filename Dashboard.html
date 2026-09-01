@@ -1181,6 +1181,9 @@
 
   <main class="main-content">
     
+    <!-- DASHBOARD VIEW -->
+    <div id="view-dashboard" class="view-container">
+
     <div class="filters-bar">
       <div class="filter-group">
         <div class="filter-item">
@@ -1222,13 +1225,10 @@
           <input type="date" class="filter-date" id="date-to" onchange="loadData()">
         </div>
       </div>
-      <button class="btn-export">
+      <button class="btn-export" onclick="exportMasterCsv()">
         📥 Export Summary
       </button>
     </div>
-
-    <!-- DASHBOARD VIEW -->
-    <div id="view-dashboard" class="view-container">
 
     <div class="dashboard-header">
       <h2 class="dashboard-title">Dashboard Summary</h2>
@@ -1248,9 +1248,12 @@
         <div class="card-label">Top Performer</div>
         <div class="card-value" id="val-top">-</div>
       </div>
-      <div class="card warning" onclick="openUnknownModal()" title="Click to inspect rows with missing dates or employee names">
-        <div class="card-label">⚠️ Unknown Activities 🔍</div>
-        <div class="card-value" id="val-unknown">-</div>
+      <div class="card unknown-card" style="cursor: pointer;" onclick="openUnknownModal()" title="Click to view detailed breakdown of missing dates/names">
+        <div class="card-label" style="display: flex; justify-content: space-between; align-items: center;">
+          <span>⚠️ Unknown Activities</span>
+          <span style="font-size: 11px; background: #ea580c; color: white; padding: 2px 6px; border-radius: 4px; font-weight: 600;">Inspect 🔍</span>
+        </div>
+        <div class="card-value" id="val-unknown" style="color: #ea580c;">-</div>
       </div>
       <div class="card">
         <div class="card-label">Master Rows</div>
@@ -1258,25 +1261,11 @@
       </div>
     </div>
 
-    <div class="export-section">
-      <div class="export-info">
-        <h3>📥 Export Master Report Data</h3>
-        <p>Download all entries from the Master Report sheet exactly as they are.</p>
-      </div>
-      <div class="export-buttons">
-        <button class="btn-excel" onclick="exportExcel()">Excel Export</button>
-        <button class="btn-csv" onclick="exportCsv()">CSV Export</button>
-      </div>
-    </div>
-
-    <div class="bottom-grid">
+    <div class="dashboard-grid">
       <div class="chart-card">
-        <div class="chart-header">
-          <div class="chart-title">Daily Trend Overview</div>
-          <h3 class="chart-value">-</h3>
-          <div class="chart-subtext">▲ 4% <span>from previous period (79,047)</span></div>
-        </div>
-        <div class="fake-chart"></div>
+        <h3 class="chart-title">Daily Activity Trend</h3>
+        <div class="chart-value">-</div>
+        <div class="chart-subtitle">Total activities recorded across all active dates</div>
       </div>
 
       <div class="performers-card">
