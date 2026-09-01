@@ -3,6 +3,7 @@
 <head>
   <base target="_top">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <style>
     :root {
       --primary-blue: #3b5998;
@@ -720,6 +721,189 @@
       transition: width 0.4s ease;
     }
 
+    /* Submenu Navigation */
+    .menu-item-group {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .submenu {
+      padding-left: 20px;
+      margin-bottom: 4px;
+    }
+
+    .submenu.hidden {
+      display: none;
+    }
+
+    .submenu-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      color: var(--text-light);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .submenu-item:hover {
+      background-color: #f1f5f9;
+      color: var(--text-dark);
+    }
+
+    .submenu-item.active {
+      background-color: #e0e7ff;
+      color: #4338ca;
+      font-weight: 600;
+    }
+
+    /* Report Views Styling */
+    .report-card {
+      background: white;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+      overflow: hidden;
+      margin-top: 20px;
+    }
+
+    .report-table-container {
+      width: 100%;
+      overflow-x: auto;
+      max-height: 65vh;
+    }
+
+    .report-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .report-table thead tr {
+      background-color: #f8fafc;
+      border-bottom: 2px solid var(--border-color);
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+
+    .report-table th {
+      padding: 14px 18px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      text-align: right;
+    }
+
+    .report-table th:first-child {
+      text-align: left;
+      position: sticky;
+      left: 0;
+      background-color: #f8fafc;
+      z-index: 3;
+      box-shadow: 2px 0 4px rgba(0,0,0,0.02);
+    }
+
+    .report-table tbody tr {
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .report-table tbody tr:hover {
+      background-color: #f8fafc;
+    }
+
+    .report-table td {
+      padding: 12px 18px;
+      text-align: right;
+      color: #334155;
+      font-weight: 500;
+    }
+
+    .report-table td:first-child {
+      text-align: left;
+      font-weight: 600;
+      color: #1e293b;
+      position: sticky;
+      left: 0;
+      background-color: white;
+      z-index: 1;
+      box-shadow: 2px 0 4px rgba(0,0,0,0.02);
+    }
+
+    .report-table tbody tr:hover td:first-child {
+      background-color: #f8fafc;
+    }
+
+    .btn-filter-blue {
+      background-color: #2563eb;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.15s;
+    }
+    .btn-filter-blue:hover { background-color: #1d4ed8; }
+
+    .btn-clear-filter {
+      background-color: white;
+      color: #dc2626;
+      border: 1px solid #fecaca;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.15s;
+    }
+    .btn-clear-filter:hover { background-color: #fef2f2; }
+
+    .btn-export-excel {
+      background-color: #4f46e5;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.15s;
+    }
+    .btn-export-excel:hover { background-color: #4338ca; }
+
+    .btn-copy-image {
+      background-color: #10b981;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.15s;
+    }
+    .btn-copy-image:hover { background-color: #059669; }
+
     /* Modal Popup Overlay */
     .modal-overlay {
       position: fixed;
@@ -884,9 +1068,19 @@
         <span class="menu-icon">📈</span>
         Analytics
       </div>
-      <div class="menu-item">
-        <span class="menu-icon">📋</span>
-        Reports ▼
+      <div class="menu-item-group">
+        <div class="menu-item" id="menu-reports-parent" onclick="toggleReportsMenu()">
+          <span class="menu-icon">📋</span>
+          Reports <span id="reports-arrow" style="font-size: 10px; margin-left: auto;">▼</span>
+        </div>
+        <div class="submenu hidden" id="reports-submenu">
+          <div class="submenu-item" id="menu-monthly-report" onclick="switchView('monthly-report')">
+            <span>📅</span> Monthly Report
+          </div>
+          <div class="submenu-item" id="menu-custom-date-report" onclick="switchView('custom-date-report')">
+            <span>📆</span> Custom Date Report
+          </div>
+        </div>
       </div>
       <div class="menu-item">
         <span class="menu-icon">🔄</span>
@@ -1201,6 +1395,91 @@
 
     </div>
 
+    <!-- MONTHLY REPORT VIEW -->
+    <div id="view-monthly-report" class="view-container hidden">
+      <div class="dashboard-header">
+        <h2 class="dashboard-title">Monthly Report</h2>
+        <p class="dashboard-subtitle">Date-wise activity reporting summary</p>
+      </div>
+
+      <div class="filters-bar" style="margin-bottom: 0;">
+        <div class="filter-group">
+          <input type="date" class="filter-date" id="mr-date-from">
+          <input type="date" class="filter-date" id="mr-date-to">
+          <button class="btn-filter-blue" onclick="loadMonthlyReport()">
+            🔍 Filter Date Range
+          </button>
+          <button class="btn-clear-filter" onclick="clearMonthlyReportFilter()">
+            ✖ Clear Filter
+          </button>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button class="btn-export-excel" onclick="exportMonthlyReportExcel()">
+            📥 Export Monthly Excel
+          </button>
+          <button class="btn-copy-image" onclick="copyTableAsImage('mr-table-card', 'Monthly_Report')">
+            📷 Copy as Image
+          </button>
+        </div>
+      </div>
+
+      <div class="report-card" id="mr-table-card">
+        <div class="report-table-container">
+          <table class="report-table" id="monthly-report-table">
+            <thead>
+              <tr id="mr-thead-tr">
+                <th>DATE</th>
+              </tr>
+            </thead>
+            <tbody id="mr-tbody">
+              <tr><td colspan="10" style="text-align: center; padding: 30px; color: var(--text-light);">Loading monthly report data...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- CUSTOM DATE REPORT VIEW -->
+    <div id="view-custom-date-report" class="view-container hidden">
+      <div class="dashboard-header">
+        <h2 class="dashboard-title">Custom Date Report</h2>
+        <p class="dashboard-subtitle">Generate and export employee statistics for specific dates</p>
+      </div>
+
+      <div class="filters-bar" style="margin-bottom: 0;">
+        <div class="filter-group">
+          <input type="date" class="filter-date" id="cdr-date-from">
+          <input type="date" class="filter-date" id="cdr-date-to">
+          <button class="btn-filter-blue" onclick="loadCustomDateReport()">
+            🔄 Generate Report
+          </button>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button class="btn-copy-image" style="background-color: #059669;" onclick="exportCustomDateReportExcel()">
+            📥 Export Excel
+          </button>
+          <button class="btn-copy-image" onclick="copyTableAsImage('cdr-table-card', 'Custom_Date_Report')">
+            📷 Copy as Image
+          </button>
+        </div>
+      </div>
+
+      <div class="report-card" id="cdr-table-card">
+        <div class="report-table-container">
+          <table class="report-table" id="custom-date-report-table">
+            <thead>
+              <tr id="cdr-thead-tr">
+                <th>NAME</th>
+              </tr>
+            </thead>
+            <tbody id="cdr-tbody">
+              <tr><td colspan="10" style="text-align: center; padding: 30px; color: var(--text-light);">Loading custom date report...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
   </main>
 
   <!-- Unknown Activities Modal -->
@@ -1486,26 +1765,45 @@
       populateAnalytics(data);
     }
 
+    function toggleReportsMenu() {
+      const submenu = document.getElementById('reports-submenu');
+      const arrow = document.getElementById('reports-arrow');
+      if (submenu) {
+        submenu.classList.toggle('hidden');
+        if (arrow) {
+          arrow.innerText = submenu.classList.contains('hidden') ? '▼' : '▲';
+        }
+      }
+    }
+
     function switchView(viewName) {
       const viewDash = document.getElementById('view-dashboard');
       const viewLb = document.getElementById('view-leaderboard');
       const viewEmp = document.getElementById('view-employees');
       const viewAna = document.getElementById('view-analytics');
+      const viewMr = document.getElementById('view-monthly-report');
+      const viewCdr = document.getElementById('view-custom-date-report');
 
       const menuDash = document.getElementById('menu-dashboard');
       const menuLb = document.getElementById('menu-leaderboard');
       const menuEmp = document.getElementById('menu-employees');
       const menuAna = document.getElementById('menu-analytics');
+      const menuMr = document.getElementById('menu-monthly-report');
+      const menuCdr = document.getElementById('menu-custom-date-report');
 
       viewDash.classList.add('hidden');
       viewLb.classList.add('hidden');
       if (viewEmp) viewEmp.classList.add('hidden');
       if (viewAna) viewAna.classList.add('hidden');
+      if (viewMr) viewMr.classList.add('hidden');
+      if (viewCdr) viewCdr.classList.add('hidden');
 
       if (menuDash) menuDash.classList.remove('active');
       if (menuLb) menuLb.classList.remove('active');
       if (menuEmp) menuEmp.classList.remove('active');
       if (menuAna) menuAna.classList.remove('active');
+      if (menuMr) menuMr.classList.remove('active');
+      if (menuCdr) menuCdr.classList.remove('active');
 
       if (viewName === 'leaderboard') {
         viewLb.classList.remove('hidden');
@@ -1517,6 +1815,18 @@
       } else if (viewName === 'analytics') {
         if (viewAna) viewAna.classList.remove('hidden');
         if (menuAna) menuAna.classList.add('active');
+      } else if (viewName === 'monthly-report') {
+        if (viewMr) viewMr.classList.remove('hidden');
+        if (menuMr) menuMr.classList.add('active');
+        const submenu = document.getElementById('reports-submenu');
+        if (submenu) submenu.classList.remove('hidden');
+        loadMonthlyReport();
+      } else if (viewName === 'custom-date-report') {
+        if (viewCdr) viewCdr.classList.remove('hidden');
+        if (menuCdr) menuCdr.classList.add('active');
+        const submenu = document.getElementById('reports-submenu');
+        if (submenu) submenu.classList.remove('hidden');
+        loadCustomDateReport();
       } else {
         viewDash.classList.remove('hidden');
         if (menuDash) menuDash.classList.add('active');
@@ -2052,6 +2362,232 @@
 
         container.appendChild(row);
       });
+    }
+
+    // ==========================================
+    // MONTHLY REPORT CONTROLLERS
+    // ==========================================
+    let currentMonthlyReportData = null;
+
+    function loadMonthlyReport() {
+      const fromInput = document.getElementById('mr-date-from');
+      const toInput = document.getElementById('mr-date-to');
+      const fromVal = fromInput ? fromInput.value : '';
+      const toVal = toInput ? toInput.value : '';
+
+      const tbody = document.getElementById('mr-tbody');
+      tbody.innerHTML = '<tr><td colspan="20" style="text-align: center; padding: 30px; color: var(--text-light);">Loading date-wise activity summary...</td></tr>';
+
+      google.script.run
+        .withSuccessHandler(populateMonthlyReport)
+        .withFailureHandler(function(err) {
+          tbody.innerHTML = `<tr><td colspan="20" style="text-align: center; padding: 30px; color: #ef4444;">Error loading report: ${err.message || err}</td></tr>`;
+        })
+        .getMonthlyReportData(fromVal, toVal);
+    }
+
+    function populateMonthlyReport(data) {
+      if (!data) return;
+      currentMonthlyReportData = data;
+
+      const theadTr = document.getElementById('mr-thead-tr');
+      theadTr.innerHTML = '<th>DATE</th>';
+      (data.columns || []).forEach(col => {
+        const th = document.createElement('th');
+        th.innerText = col.toUpperCase();
+        theadTr.appendChild(th);
+      });
+
+      const tbody = document.getElementById('mr-tbody');
+      tbody.innerHTML = '';
+
+      if (!data.rows || data.rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="${(data.columns.length || 0) + 1}" style="text-align: center; padding: 30px; color: var(--text-light);">No data found for the selected date range.</td></tr>`;
+        return;
+      }
+
+      data.rows.forEach(r => {
+        const tr = document.createElement('tr');
+        let html = `<td>${r.date}</td>`;
+        data.columns.forEach(col => {
+          const val = r.counts[col] || 0;
+          html += `<td>${val > 0 ? val.toLocaleString() : '0'}</td>`;
+        });
+        tr.innerHTML = html;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function clearMonthlyReportFilter() {
+      const fromInput = document.getElementById('mr-date-from');
+      const toInput = document.getElementById('mr-date-to');
+      if (fromInput) fromInput.value = '';
+      if (toInput) toInput.value = '';
+      loadMonthlyReport();
+    }
+
+    function exportMonthlyReportExcel() {
+      if (!currentMonthlyReportData || !currentMonthlyReportData.rows) {
+        alert('No report data available to export.');
+        return;
+      }
+
+      let csv = 'DATE,' + currentMonthlyReportData.columns.map(c => `"${c.replace(/"/g, '""')}"`).join(',') + '\n';
+      currentMonthlyReportData.rows.forEach(r => {
+        const rowVals = [r.date];
+        currentMonthlyReportData.columns.forEach(col => {
+          rowVals.push(r.counts[col] || 0);
+        });
+        csv += rowVals.join(',') + '\n';
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `Monthly_Report_${new Date().toISOString().slice(0,10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // ==========================================
+    // CUSTOM DATE REPORT CONTROLLERS
+    // ==========================================
+    let currentCustomDateReportData = null;
+
+    function loadCustomDateReport() {
+      const fromInput = document.getElementById('cdr-date-from');
+      const toInput = document.getElementById('cdr-date-to');
+      const fromVal = fromInput ? fromInput.value : '';
+      const toVal = toInput ? toInput.value : '';
+
+      const tbody = document.getElementById('cdr-tbody');
+      tbody.innerHTML = '<tr><td colspan="20" style="text-align: center; padding: 30px; color: var(--text-light);">Loading employee statistics...</td></tr>';
+
+      google.script.run
+        .withSuccessHandler(populateCustomDateReport)
+        .withFailureHandler(function(err) {
+          tbody.innerHTML = `<tr><td colspan="20" style="text-align: center; padding: 30px; color: #ef4444;">Error loading report: ${err.message || err}</td></tr>`;
+        })
+        .getCustomDateReportData(fromVal, toVal);
+    }
+
+    function populateCustomDateReport(data) {
+      if (!data) return;
+      currentCustomDateReportData = data;
+
+      const theadTr = document.getElementById('cdr-thead-tr');
+      theadTr.innerHTML = '<th>NAME</th>';
+      (data.columns || []).forEach(col => {
+        const th = document.createElement('th');
+        th.innerText = col.toUpperCase();
+        theadTr.appendChild(th);
+      });
+
+      const tbody = document.getElementById('cdr-tbody');
+      tbody.innerHTML = '';
+
+      if (!data.rows || data.rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="${(data.columns.length || 0) + 1}" style="text-align: center; padding: 30px; color: var(--text-light);">No employee activity found for the selected date range.</td></tr>`;
+        return;
+      }
+
+      data.rows.forEach(r => {
+        const tr = document.createElement('tr');
+        let html = `<td>${r.name}</td>`;
+        data.columns.forEach(col => {
+          const val = r.counts[col] || 0;
+          html += `<td>${val > 0 ? val.toLocaleString() : '0'}</td>`;
+        });
+        tr.innerHTML = html;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function exportCustomDateReportExcel() {
+      if (!currentCustomDateReportData || !currentCustomDateReportData.rows) {
+        alert('No report data available to export.');
+        return;
+      }
+
+      let csv = 'NAME,' + currentCustomDateReportData.columns.map(c => `"${c.replace(/"/g, '""')}"`).join(',') + '\n';
+      currentCustomDateReportData.rows.forEach(r => {
+        const rowVals = [`"${r.name.replace(/"/g, '""')}"`];
+        currentCustomDateReportData.columns.forEach(col => {
+          rowVals.push(r.counts[col] || 0);
+        });
+        csv += rowVals.join(',') + '\n';
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `Custom_Date_Report_${new Date().toISOString().slice(0,10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // ==========================================
+    // COPY AS IMAGE UTILITY (html2canvas)
+    // ==========================================
+    function copyTableAsImage(elementId, reportName) {
+      const card = document.getElementById(elementId);
+      if (!card) return;
+
+      if (typeof html2canvas === 'undefined') {
+        alert('Image snapshot tool is loading, please try again in a few seconds.');
+        return;
+      }
+
+      const originalBtn = event ? event.target : null;
+      let prevText = '';
+      if (originalBtn) {
+        prevText = originalBtn.innerText;
+        originalBtn.innerText = 'Capturing...';
+        originalBtn.disabled = true;
+      }
+
+      html2canvas(card, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        useCORS: true
+      }).then(canvas => {
+        if (originalBtn) {
+          originalBtn.innerText = prevText;
+          originalBtn.disabled = false;
+        }
+
+        canvas.toBlob(blob => {
+          if (navigator.clipboard && window.ClipboardItem) {
+            navigator.clipboard.write([
+              new ClipboardItem({ 'image/png': blob })
+            ]).then(() => {
+              alert('🎉 Table copied as image to your clipboard! You can now paste (Ctrl+V) it anywhere.');
+            }).catch(() => {
+              downloadCanvasImage(canvas, reportName);
+            });
+          } else {
+            downloadCanvasImage(canvas, reportName);
+          }
+        }, 'image/png');
+      }).catch(err => {
+        if (originalBtn) {
+          originalBtn.innerText = prevText;
+          originalBtn.disabled = false;
+        }
+        alert('Failed to capture table image: ' + (err.message || err));
+      });
+    }
+
+    function downloadCanvasImage(canvas, reportName) {
+      const link = document.createElement('a');
+      link.download = `${reportName}_${new Date().toISOString().slice(0,10)}.png`;
+      link.href = canvas.toDataURL('image/png');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      alert('📷 Image downloaded successfully!');
     }
 
     // Call on load

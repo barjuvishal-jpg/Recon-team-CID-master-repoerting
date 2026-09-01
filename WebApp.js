@@ -911,3 +911,191 @@ function getMasterReportCsvData() {
     combinedCsv: combinedLines.join('\r\n')
   };
 }
+
+/**
+ * Returns date-wise aggregated matrix for the Monthly Report
+ */
+function getMonthlyReportData(dateFrom = '', dateTo = '') {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const closeCasesSheet = getSheetByNameTrimmed(ss, "Close Cases");
+  const forwardedCasesSheet = getSheetByNameTrimmed(ss, "Forwarded cases");
+
+  const fromD = dateFrom ? parseDateValue(dateFrom) : null;
+  const toD = dateTo ? parseDateValue(dateTo) : null;
+
+  const activityColumns = [];
+  const dateMap = {};
+
+  function processSheet(sheet, isForwarded) {
+    if (!sheet) return;
+    const data = sheet.getDataRange().getValues();
+    if (data.length < 2) return;
+
+    const headers = data[0].map(h => String(h || '').trim());
+    const empCols = [];
+    headers.forEach((h, idx) => {
+      const lower = h.toLowerCase().replace(/[^a-z]/g, '');
+      if (isForwarded) {
+        if (lower.includes('forwardedby') || lower.includes('forwardby')) empCols.push(idx);
+      } else {
+        if (lower.includes('closedby') || lower === 'closedby') empCols.push(idx);
+      }
+    });
+
+    const s1EmpIdx = empCols.length > 0 ? empCols[0] : (isForwarded ? 6 : 5);
+    const s2EmpIdx = empCols.length > 1 ? empCols[1] : (isForwarded ? 12 : 10);
+
+    const s1Cols = [];
+    for (let c = 1; c < s1EmpIdx && c < headers.length; c++) {
+      if (headers[c] && headers[c] !== '') {
+        const colName = headers[c];
+        s1Cols.push({ index: c, name: colName });
+        if (!activityColumns.includes(colName)) activityColumns.push(colName);
+      }
+    }
+
+    const s2Cols = [];
+    for (let c = s1EmpIdx + 1; c < headers.length; c++) {
+      if (c !== s2EmpIdx && headers[c] && headers[c] !== '') {
+        const colName = headers[c];
+        s2Cols.push({ index: c, name: colName });
+        if (!activityColumns.includes(colName)) activityColumns.push(colName);
+      }
+    }
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const rawDate = row[0];
+      const dObj = parseDateValue(rawDate);
+      if (!dObj) continue;
+
+      if (fromD && dObj.getTime() < fromD.getTime()) continue;
+      if (toD && dObj.getTime() > toD.getTime()) continue;
+
+      const dStr = formatDateStr(dObj);
+      const dTime = dObj.getTime();
+
+      if (!dateMap[dStr]) {
+        dateMap[dStr] = { date: dStr, time: dTime, counts: {} };
+      }
+
+      s1Cols.forEach(col => {
+        const val = row[col.index];
+        if (val !== undefined && val !== null && String(val).trim() !== '') {
+          dateMap[dStr].counts[col.name] = (dateMap[dStr].counts[col.name] || 0) + 1;
+        }
+      });
+
+      s2Cols.forEach(col => {
+        const val = row[col.index];
+        if (val !== undefined && val !== null && String(val).trim() !== '') {
+          dateMap[dStr].counts[col.name] = (dateMap[dStr].counts[col.name] || 0) + 1;
+        }
+      });
+    }
+  }
+
+  processSheet(closeCasesSheet, false);
+  processSheet(forwardedCasesSheet, true);
+
+  const rows = Object.values(dateMap).sort((a, b) => a.time - b.time);
+
+  return {
+    columns: activityColumns,
+    rows: rows
+  };
+}
+
+/**
+ * Returns employee-wise aggregated matrix for the Custom Date Report
+ */
+function getCustomDateReportData(dateFrom = '', dateTo = '') {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const closeCasesSheet = getSheetByNameTrimmed(ss, "Close Cases");
+  const forwardedCasesSheet = getSheetByNameTrimmed(ss, "Forwarded cases");
+
+  const fromD = dateFrom ? parseDateValue(dateFrom) : null;
+  const toD = dateTo ? parseDateValue(dateTo) : null;
+
+  const activityColumns = [];
+  const empMap = {};
+
+  function processSheet(sheet, isForwarded) {
+    if (!sheet) return;
+    const data = sheet.getDataRange().getValues();
+    if (data.length < 2) return;
+
+    const headers = data[0].map(h => String(h || '').trim());
+    const empCols = [];
+    headers.forEach((h, idx) => {
+      const lower = h.toLowerCase().replace(/[^a-z]/g, '');
+      if (isForwarded) {
+        if (lower.includes('forwardedby') || lower.includes('forwardby')) empCols.push(idx);
+      } else {
+        if (lower.includes('closedby') || lower === 'closedby') empCols.push(idx);
+      }
+    });
+
+    const s1EmpIdx = empCols.length > 0 ? empCols[0] : (isForwarded ? 6 : 5);
+    const s2EmpIdx = empCols.length > 1 ? empCols[1] : (isForwarded ? 12 : 10);
+
+    const s1Cols = [];
+    for (let c = 1; c < s1EmpIdx && c < headers.length; c++) {
+      if (headers[c] && headers[c] !== '') {
+        const colName = headers[c];
+        s1Cols.push({ index: c, name: colName });
+        if (!activityColumns.includes(colName)) activityColumns.push(colName);
+      }
+    }
+
+    const s2Cols = [];
+    for (let c = s1EmpIdx + 1; c < headers.length; c++) {
+      if (c !== s2EmpIdx && headers[c] && headers[c] !== '') {
+        const colName = headers[c];
+        s2Cols.push({ index: c, name: colName });
+        if (!activityColumns.includes(colName)) activityColumns.push(colName);
+      }
+    }
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const rawDate = row[0];
+      const dObj = parseDateValue(rawDate);
+      
+      if (fromD && (!dObj || dObj.getTime() < fromD.getTime())) continue;
+      if (toD && (!dObj || dObj.getTime() > toD.getTime())) continue;
+
+      const emp1 = normalizeEmployeeName(row[s1EmpIdx]);
+      if (emp1) {
+        if (!empMap[emp1]) empMap[emp1] = { name: emp1, counts: {} };
+        s1Cols.forEach(col => {
+          const val = row[col.index];
+          if (val !== undefined && val !== null && String(val).trim() !== '') {
+            empMap[emp1].counts[col.name] = (empMap[emp1].counts[col.name] || 0) + 1;
+          }
+        });
+      }
+
+      const emp2 = normalizeEmployeeName(row[s2EmpIdx]);
+      if (emp2) {
+        if (!empMap[emp2]) empMap[emp2] = { name: emp2, counts: {} };
+        s2Cols.forEach(col => {
+          const val = row[col.index];
+          if (val !== undefined && val !== null && String(val).trim() !== '') {
+            empMap[emp2].counts[col.name] = (empMap[emp2].counts[col.name] || 0) + 1;
+          }
+        });
+      }
+    }
+  }
+
+  processSheet(closeCasesSheet, false);
+  processSheet(forwardedCasesSheet, true);
+
+  const rows = Object.values(empMap).sort((a, b) => a.name.localeCompare(b.name));
+
+  return {
+    columns: activityColumns,
+    rows: rows
+  };
+}
