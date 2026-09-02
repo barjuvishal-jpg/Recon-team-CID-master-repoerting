@@ -1101,17 +1101,56 @@ function getCustomDateReportData(dateFrom = '', dateTo = '') {
 }
 
 /**
+ * Helper to safely open source Google Spreadsheet by URL or Spreadsheet ID
+ */
+function openSourceSpreadsheet(sourceInput) {
+  if (!sourceInput) {
+    throw new Error("Please enter a valid Source Spreadsheet URL or ID in Config!B2");
+  }
+  const input = String(sourceInput).trim();
+  if (input.startsWith("http://") || input.startsWith("https://")) {
+    return SpreadsheetApp.openByUrl(input);
+  } else {
+    return SpreadsheetApp.openById(input);
+  }
+}
+
+/**
+ * Ensures the 'Config' sheet exists with required baseline template structure
+ */
+function ensureConfigSheet(ss) {
+  if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
+  let config = ss.getSheetByName("Config");
+  if (!config) {
+    config = ss.insertSheet("Config");
+    config.getRange("A1:B5").setValues([
+      ["CONFIG FIELD", "VALUE"],
+      ["Source Spreadsheet URL", ""],
+      ["Last Sync Time", "Never"],
+      ["Sync Status", "Ready"],
+      ["Total Rows Imported", 0]
+    ]);
+    config.getRange("A8:D10").setValues([
+      ["Import Type", "Source Tab", "Destination Tab", "Clear Before Import"],
+      ["Close Cases", "August Close Cases", "Close Cases", true],
+      ["Forwarded Cases", "August Forwarded cases", "Forwarded cases", true]
+    ]);
+    config.getRange("A15:D15").setValues([
+      ["Sync Date Time", "Close Rows", "Forwarded Rows", "Status"]
+    ]);
+    config.getRange("A1:B1").setFontWeight("bold").setBackground("#e0e7ff");
+    config.getRange("A8:D8").setFontWeight("bold").setBackground("#e0e7ff");
+    config.getRange("A15:D15").setFontWeight("bold").setBackground("#e0e7ff");
+  }
+  return config;
+}
+
+/**
  * Retrieves current sync configuration, mappings, and historical audit logs from Config sheet
  */
 function getSyncStatusData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const config = ss.getSheetByName("Config");
-
-  if (!config) {
-    return {
-      error: "Config sheet not found in the spreadsheet."
-    };
-  }
+  const config = ensureConfigSheet(ss);
 
   const sourceUrl = String(config.getRange("B2").getDisplayValue() || '').trim();
   const lastSyncRaw = config.getRange("B3").getValue();
@@ -1119,15 +1158,18 @@ function getSyncStatusData() {
   const status = String(config.getRange("B4").getDisplayValue() || 'Ready').trim();
   const totalImported = config.getRange("B5").getValue() || 0;
 
-  // Read mappings from A9:D10
-  const mappingVals = config.getRange("A9:D10").getValues();
-  const mappings = mappingVals.map(m => {
-    return {
-      importType: String(m[0] || ''),
-      sourceTab: String(m[1] || ''),
-      destinationTab: String(m[2] || ''),
-      clearBeforeImport: (m[3] === true || String(m[3]).toUpperCase() === 'TRUE')
-    };
+  // Read mappings from A9:D14
+  const mappingVals = config.getRange("A9:D14").getValues();
+  const mappings = [];
+  mappingVals.forEach(m => {
+    if (m[0] || m[1] || m[2]) {
+      mappings.push({
+        importType: String(m[0] || ''),
+        sourceTab: String(m[1] || ''),
+        destinationTab: String(m[2] || ''),
+        clearBeforeImport: (m[3] === true || String(m[3]).toUpperCase() === 'TRUE')
+      });
+    }
   });
 
   // Read historical sync logs from row 16 onwards
@@ -1154,7 +1196,7 @@ function getSyncStatusData() {
   let sourceConnected = false;
   if (sourceUrl) {
     try {
-      const sourceSS = SpreadsheetApp.openByUrl(sourceUrl);
+      const sourceSS = openSourceSpreadsheet(sourceUrl);
       sourceTabs = sourceSS.getSheets().map(s => s.getName());
       sourceConnected = true;
     } catch (e) {
@@ -1170,6 +1212,7 @@ function getSyncStatusData() {
     mappings: mappings,
     sourceTabs: sourceTabs,
     sourceConnected: sourceConnected,
+    schedule: getScheduleConfiguration(),
     logs: logs.reverse()
   };
 }
@@ -1178,113 +1221,14 @@ function getSyncStatusData() {
  * Refreshes available sheet tab dropdowns from the source spreadsheet
  */
 function executeRefreshSourceTabs(customSourceUrl = '') {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const config = ss.getSheetByName("Config");
-  if (!config) throw new Error("Config sheet not found.");
-
-  if (customSourceUrl) {
-    config.getRange("B2").setValue(customSourceUrl.trim());
-  }
-
-  const sourceUrl = customSourceUrl ? customSourceUrl.trim() : String(config.getRange("B2").getDisplayValue() || '').trim();
-  if (!sourceUrl) throw new Error("Please enter a valid Source Spreadsheet URL.");
-
-  const sourceSS = SpreadsheetApp.openByUrl(sourceUrl);
-  const sheetNames = sourceSS.getSheets().map(s => s.getName());
-
-  if (sheetNames.length > 0) {
-    const rule = SpreadsheetApp.newDataValidation()
-      .requireValueInList(sheetNames, true)
-      .setAllowInvalid(false)
-      .build();
-    config.getRange("B9:B10").setDataValidation(rule);
-  }
-
-  return {
-    success: true,
-    tabs: sheetNames,
-    count: sheetNames.length
-  };
+  return executeCoreRefreshSourceTabs(customSourceUrl);
 }
 
 /**
  * Executes full data sync according to Code.js logic
  */
-function executeDataSync() {
-  const masterSS = SpreadsheetApp.getActiveSpreadsheet();
-  const config = masterSS.getSheetByName("Config");
-  if (!config) throw new Error("Config sheet not found.");
-
-  const sourceUrl = String(config.getRange("B2").getDisplayValue() || '').trim();
-  if (!sourceUrl) throw new Error("Source Spreadsheet URL is missing in Config!B2");
-
-  try {
-    const sourceSS = SpreadsheetApp.openByUrl(sourceUrl);
-    const mappings = config.getRange("A9:D10").getValues();
-
-    let totalImported = 0;
-    let closeRows = 0;
-    let forwardedRows = 0;
-
-    mappings.forEach(mapping => {
-      const importType = mapping[0];
-      const sourceTab = mapping[1];
-      const destinationTab = mapping[2];
-      const clearBeforeImport = mapping[3];
-
-      if (!sourceTab || !destinationTab) return;
-
-      const sourceSheet = sourceSS.getSheetByName(sourceTab);
-      const destinationSheet = masterSS.getSheetByName(destinationTab);
-
-      if (!sourceSheet) throw new Error(`Source tab not found: ${sourceTab}`);
-      if (!destinationSheet) throw new Error(`Destination tab not found: ${destinationTab}`);
-
-      const data = sourceSheet.getDataRange().getValues();
-      if (data.length <= 1) return;
-
-      // Clear existing data keeping headers
-      if (clearBeforeImport === true || String(clearBeforeImport).toUpperCase() === "TRUE") {
-        const lastRow = destinationSheet.getLastRow();
-        if (lastRow > 1) {
-          destinationSheet.getRange(2, 1, lastRow - 1, destinationSheet.getMaxColumns()).clearContent();
-        }
-      }
-
-      // Skip header row
-      const rows = data.slice(1);
-      destinationSheet.getRange(destinationSheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
-
-      totalImported += rows.length;
-      if (importType === "Close Cases") closeRows += rows.length;
-      if (importType === "Forwarded Cases") forwardedRows += rows.length;
-    });
-
-    // Update status cells
-    const syncTime = new Date();
-    config.getRange("B3").setValue(syncTime);
-    config.getRange("B4").setValue("Success");
-    config.getRange("B5").setValue(totalImported);
-
-    // Sync Log
-    const logRow = Math.max(config.getLastRow() + 1, 16);
-    config.getRange(logRow, 1, 1, 4).setValues([[syncTime, closeRows, forwardedRows, "Success"]]);
-
-    return {
-      success: true,
-      closeRows: closeRows,
-      forwardedRows: forwardedRows,
-      totalImported: totalImported,
-      timestamp: Utilities.formatDate(syncTime, Session.getScriptTimeZone() || 'GMT', "dd-MMM-yyyy hh:mm:ss a")
-    };
-
-  } catch (error) {
-    config.getRange("B3").setValue(new Date());
-    config.getRange("B4").setValue("Failed");
-    const logRow = Math.max(config.getLastRow() + 1, 16);
-    config.getRange(logRow, 1, 1, 4).setValues([[new Date(), 0, 0, "Failed: " + error.message]]);
-    throw new Error(error.message);
-  }
+function executeDataSync(customSourceUrl = '') {
+  return executeCoreDataSync(customSourceUrl);
 }
 
 /**
@@ -1292,17 +1236,17 @@ function executeDataSync() {
  */
 function saveSyncMappings(sourceUrl, mappingList) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const config = ss.getSheetByName("Config");
-  if (!config) throw new Error("Config sheet not found.");
+  const config = ensureConfigSheet(ss);
 
-  if (sourceUrl) {
-    config.getRange("B2").setValue(sourceUrl.trim());
+  if (sourceUrl !== undefined && sourceUrl !== null) {
+    config.getRange("B2").setValue(String(sourceUrl).trim());
   }
 
   if (Array.isArray(mappingList) && mappingList.length > 0) {
     mappingList.forEach((m, idx) => {
       const row = 9 + idx;
-      if (row <= 10) {
+      if (row <= 14) {
+        if (m.importType !== undefined) config.getRange(row, 1).setValue(m.importType);
         if (m.sourceTab !== undefined) config.getRange(row, 2).setValue(m.sourceTab);
         if (m.destinationTab !== undefined) config.getRange(row, 3).setValue(m.destinationTab);
         if (m.clearBeforeImport !== undefined) config.getRange(row, 4).setValue(m.clearBeforeImport);
@@ -1311,4 +1255,184 @@ function saveSyncMappings(sourceUrl, mappingList) {
   }
 
   return { success: true };
+}
+
+/**
+ * Retrieves background schedule config
+ */
+function getAutoSyncSchedule() {
+  return getScheduleConfiguration();
+}
+
+/**
+ * Configures background schedule trigger
+ */
+function saveAutoSyncSchedule(isEnabled, scheduleType, timeValue) {
+  return saveScheduleConfiguration(isEnabled, scheduleType, timeValue);
+}
+
+/**
+ * Deactivates background schedule triggers
+ */
+function deleteAutoSyncSchedule() {
+  deleteSyncTriggers(false);
+  return getScheduleConfiguration();
+}
+
+// ============================================================================
+// WEBAPP EMAIL SCHEDULER CONTROLLER ENDPOINTS
+// ============================================================================
+
+/**
+ * Reads all active email schedules and dispatcher status
+ */
+function getEmailSchedulerData() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ensureEmailScheduleSheet(ss);
+  const data = sheet.getDataRange().getValues();
+  const schedules = [];
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (row[0]) {
+      schedules.push({
+        id: String(row[0] || `SCH-${3000 + i}`),
+        reportType: String(row[1] || "Yesterday's Master Report"),
+        formatTemplate: String(row[2] || "Raw Master Report (All columns)"),
+        customSubject: String(row[3] || "Review Daily reports (Yesterday)"),
+        recipients: String(row[4] || ""),
+        frequency: String(row[5] || "Daily"),
+        targetHour: String(row[6] || "10:00 AM"),
+        isActive: (row[7] === true || String(row[7]).toUpperCase() === "TRUE"),
+        lastSent: String(row[8] || "-"),
+        status: String(row[9] || "Pending"),
+        createdAt: String(row[10] || "")
+      });
+    }
+  }
+
+  // Check if hourly dispatcher trigger is running
+  const triggers = ScriptApp.getProjectTriggers();
+  const isDispatcherActive = triggers.some(t => t.getHandlerFunction() === "processScheduledEmailDispatcher");
+
+  return {
+    schedules: schedules,
+    isDispatcherActive: isDispatcherActive
+  };
+}
+
+/**
+ * Saves or updates an email schedule
+ */
+function saveEmailSchedule(sched) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ensureEmailScheduleSheet(ss);
+  const data = sheet.getDataRange().getValues();
+  const timeZone = Session.getScriptTimeZone() || 'Asia/Kolkata';
+
+  let targetRow = -1;
+  const schedId = sched.id || `SCH-${Math.floor(1000 + Math.random() * 9000)}`;
+
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(schedId)) {
+      targetRow = i + 1;
+      break;
+    }
+  }
+
+  if (targetRow === -1) {
+    targetRow = sheet.getLastRow() + 1;
+  }
+
+  sheet.getRange(targetRow, 1, 1, 11).setValues([[
+    schedId,
+    sched.reportType || "Yesterday's Master Report",
+    sched.formatTemplate || "Raw Master Report (All columns)",
+    sched.customSubject || "",
+    sched.recipients || "",
+    sched.frequency || "Daily",
+    sched.targetHour || "9:00 AM",
+    (sched.isActive !== undefined ? sched.isActive : true),
+    sched.lastSent || "-",
+    sched.status || "Pending",
+    sched.createdAt || Utilities.formatDate(new Date(), timeZone, "M/d/yyyy, h:mm:ss a")
+  ]]);
+
+  // Ensure hourly dispatcher is initialized if schedule is active
+  if (sched.isActive) {
+    const triggers = ScriptApp.getProjectTriggers();
+    if (!triggers.some(t => t.getHandlerFunction() === "processScheduledEmailDispatcher")) {
+      setupEmailDispatcherTrigger();
+    }
+  }
+
+  return getEmailSchedulerData();
+}
+
+/**
+ * Deletes an email schedule
+ */
+function deleteEmailSchedule(scheduleId) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ensureEmailScheduleSheet(ss);
+  const data = sheet.getDataRange().getValues();
+
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(scheduleId)) {
+      sheet.deleteRow(i + 1);
+      break;
+    }
+  }
+
+  return getEmailSchedulerData();
+}
+
+/**
+ * Immediately dispatches an email schedule test run
+ */
+function executeSendEmailScheduleNow(sched) {
+  return sendScheduledReportEmail(sched);
+}
+
+/**
+ * Toggles hourly dispatcher trigger
+ */
+function toggleEmailDispatcher(enable) {
+  if (enable) {
+    return setupEmailDispatcherTrigger();
+  } else {
+    return deleteEmailDispatcherTrigger();
+  }
+}
+
+// ============================================================================
+// WEBAPP ACCESS CONTROL CONTROLLER ENDPOINTS
+// ============================================================================
+
+/**
+ * Reads all registered access control users
+ */
+function getAccessControlList() {
+  return getAccessUsersData();
+}
+
+/**
+ * Saves or updates an access control user
+ */
+function saveAccessControlUser(user) {
+  return saveAccessUser(user);
+}
+
+/**
+ * Deletes an access control user
+ */
+function deleteAccessControlUser(email) {
+  return deleteAccessUser(email);
+}
+
+/**
+ * Authenticates user login
+ */
+function authenticateLogin(email, password) {
+  return validateUserLogin(email, password);
 }
